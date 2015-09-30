@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xmlns:int="http://www.springframework.org/schema/integration"
+	xmlns:file="http://www.springframework.org/schema/integration/file"
+	xmlns:int-amqp="http://www.springframework.org/schema/integration/amqp"
+	xmlns:jpa="http://www.springframework.org/schema/integration/jpa"
+	xmlns:websocket="http://www.springframework.org/schema/integration/websocket"
+	xsi:schemaLocation="http://www.springframework.org/schema/integration/websocket http://www.springframework.org/schema/integration/websocket/spring-integration-websocket.xsd
+		http://www.springframework.org/schema/integration/amqp http://www.springframework.org/schema/integration/amqp/spring-integration-amqp.xsd
+		http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd
+		http://www.springframework.org/schema/integration/file http://www.springframework.org/schema/integration/file/spring-integration-file.xsd
+		http://www.springframework.org/schema/integration/jpa http://www.springframework.org/schema/integration/jpa/spring-integration-jpa.xsd
+		http://www.springframework.org/schema/integration http://www.springframework.org/schema/integration/spring-integration.xsd">
+
+	<int:inbound-channel-adapter channel="stock-input"
+		ref="emcStockSimulator" method="getNextStockPrice">
+		<int:poller fixed-rate="1000" />
+	</int:inbound-channel-adapter>
+
+	<int:inbound-channel-adapter channel="stock-input"
+		ref="teslaStockSimulator" method="getNextStockPrice">
+		<int:poller fixed-rate="1000" />
+	</int:inbound-channel-adapter>
+
+	<int:publish-subscribe-channel id="stock-input"
+		ignore-failures="true"></int:publish-subscribe-channel>
+
+	<int:service-activator input-channel="stock-input"
+		ref="persister" method="save" output-channel="publish-subscribe-channel1" />
+
+
+	<int:service-activator input-channel="stock-input"
+		output-channel="channel2" ref="cashPositionServiceActivator" method="calculateCashPositions" />
+
+	<int:publish-subscribe-channel id="publish-subscribe-channel1"></int:publish-subscribe-channel>
+
+ 	<websocket:server-container id="serverWebSocketContainer" path="/position">
+		<websocket:sockjs/>
+	</websocket:server-container>
+	<websocket:outbound-channel-adapter
+		container="serverWebSocketContainer" default-protocol-handler="stompSubProtocolHandler" channel="channel3"/>
+
+	<int:transformer input-channel="publish-subscribe-channel1" output-channel="channel3" ref="headerEnricher"></int:transformer>
+
+	<int:logging-channel-adapter channel="publish-subscribe-channel1" />
+	<int:channel id="channel2" />
+	<int:logging-channel-adapter channel="channel2" />
+	<int:channel id="channel3"></int:channel>
+	<int:gateway></int:gateway>
+	
+	<int:channel id="channel5"></int:channel>
+</beans>
